@@ -1,0 +1,81 @@
+Contact
++32 470473799 (Work)
+capobianco.be@gmail.com
+www.linkedin.com/in/anthony-capobianco (LinkedIn)
+anth.pro (Other)
+github.com/FullAegis (Portfolio)
+www.hackerrank.com/profile/unsigned_lemon (Personal)
+exercism.org/profiles/viraltaco (Portfolio)
+
+Top Skills
+Test-Driven Development
+Software Development
+C++
+
+Languages
+French (Native or Bilingual)
+English (Native or Bilingual)
+
+Certifications
+Parallel and Concurrent Programming with C++ Part 1
+Responsible AI: Principles and Practical Applications
+Full Stack Développeur .NET orienté Cybersécurité
+C++ Best Practices for Developers
+C++: Advanced Topics
+
+Anthony Capobianco
+Junior Developer C++, .NET C# | Bilingual (EN, FR) Eligible Tremplin 24+, Impulsion 12 mois+, PFI, SESAM et APE.
+Charleroi, Walloon Region, Belgium
+
+Summary
+Top Skills: C++, C#, Java, SQL.
+C++ System engineer, and .NET C# Full-Stack Developer, driven to create clean, efficient, and user-friendly software, and libraries. Skilled at turning complex requirements into reliable, maintainable code. As a neurodivergent professional (ASD/ADHD), I offer strong focus, pattern recognition, and a methodical problem-solving approach-key strengths for debugging and ensuring high code quality.
+Seeking a junior full-stack developer role in Belgium to join a collaborative team, contribute to challenging projects, and grow as a software engineer.
+Open to connecting and discussing technology or opportunities.
+
+Experience
+
+Technofutur TIC
+Cybersecurity oriented Full Stack.NET developer
+February 2025 - August 2025 (7 months)
+Charleroi, Walloon Region, Belgium
+
+Ville de La Louvière
+Administrative employee
+May 2022 - June 2022 (2 months)
+La Louvière, Walloon Region, Belgium
+As an administrative employee for the Economic Development Department of the city of La Louvière, I was responsible for compiling a register of businesses in the city. This task was carried out partly (3 days/week) through fieldwork, and partly (2 days/week) in the office.
+
+Pauz' Détente
+Full Stack Developer
+July 2016 - December 2020 (4 years 6 months)
+La Louvière
+Initial setup, periodical maintenance, and on-call support of the computer fleet and LAN
+Website administration (backend & SEO)
+
+Linkebel
+Web Designer
+March 2016 - June 2016 (4 months)
+Binche, Walloon Region, Belgium
+Conceptions:
+• Campaign flyers and posters for an exterior façade renovation company. (InDesign)
+• Company logo for Linkebel. (Illustrator)
+• Website and content copywriting for a relaxation center. (PHP, CSS, JS)
+• Online portfolio design and content integration for a local photographer. (WordPress)
+
+Education
+
+Technofutur TIC
+Full Stack Développeur .NET orienté Cybersécurité, Computer Programming/Programmer, General (February 2025 - August 2025)
+
+IPAM La Louvière
+Bachelor's degree, Management Information Systems, Business Informatics (September 2017 - June 2021)
+
+IRAM Promotion Sociale
+Higher Education Certificate, Computer Graphics, Web Design (September 2014 - June 2016)
+
+Institut Saint Joseph de La Louvière
+General Secondary, Natural Sciences (September 2007 - June 2010)
+
+exercism.org
+(November 2018)
