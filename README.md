@@ -79,6 +79,47 @@ SCRAPE_HEADLESS=True
 ### 5. Resume Setup
 Create a file named `resume.txt` in the root of the project and paste your resume content there. The engine will redact all contact information (emails, phone numbers, location addresses) before drafting the cover letter.
 
+### 6. Customizing Search Queries
+The job hunter crawls multiple portals using search queries derived from [search_config.json](file:///Users/viraltaco_/Library/Mobile%20Documents/com~apple~CloudDocs/Projects/python/Job%20Hunter/search_config.json).
+
+#### Modifying Keywords and Locations
+To change what jobs and locations are queried, edit [search_config.json](file:///Users/viraltaco_/Library/Mobile%20Documents/com~apple~CloudDocs/Projects/python/Job%20Hunter/search_config.json) in the root of the project:
+
+```json
+{
+  "keywords": [
+    "C++",
+    "Developer"
+  ],
+  "locations": [
+    "Charleroi",
+    "Brussels"
+  ],
+  "sheet_name": "Job Hunter — Belgium ICT Job Search",
+  "sheet_tab": "Jobs"
+}
+```
+
+- **`keywords`**: A list of job title keywords or technical stack terms to search.
+- **`locations`**: A list of cities or regions in Belgium to target.
+- **`sheet_name`**: Configures the target Google Sheet title.
+- **`sheet_tab`**: Configures the tab name in the spreadsheet where listings will be written.
+
+The automation pipeline will execute parallel worker threads for every combination of keyword and location (e.g. `C++` in `Charleroi`, `Developer` in `Charleroi`, etc.).
+
+#### Advanced: Modifying URL Templates and Selectors
+If you want to customize how search URLs are structured or add selectors for different websites, you can modify `SELECTOR_CONFIG` in [scraper/selectors.py](file:///Users/viraltaco_/Library/Mobile%20Documents/com~apple~CloudDocs/Projects/python/Job%20Hunter/scraper/selectors.py).
+
+Each portal config specifies a `search_url` template. The scraper replaces `{keyword}` and `{location}` placeholders at runtime with URL-encoded values from your config. For example:
+```python
+    "ictjob": {
+        "search_url": "https://www.ictjob.be/en/search-it-jobs?keywords={keyword}&location={location}",
+        "listing_container": "li.search-item",
+        "title": "a.job-title",
+        ...
+    }
+```
+
 ---
 
 ## Usage
