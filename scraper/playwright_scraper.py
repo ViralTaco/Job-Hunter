@@ -21,6 +21,7 @@ class PlaywrightScraper(BaseScraper):
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
         ]
+        self.scraped_urls_in_session = set()
 
     def _get_random_user_agent(self) -> str:
         return random.choice(self.user_agents)
@@ -72,15 +73,26 @@ class PlaywrightScraper(BaseScraper):
             self._apply_anti_bot_measures(context)
             
             for site_name, config in SELECTOR_CONFIG.items():
+                # Generate search URL
+                encoded_keyword = urllib.parse.quote(keyword)
+                encoded_location = urllib.parse.quote(location)
+                
+                has_location = "{location}" in config["search_url"]
+                if has_location:
+                    url = config["search_url"].format(keyword=encoded_keyword, location=encoded_location)
+                else:
+                    url = config["search_url"].format(keyword=encoded_keyword)
+                
+                # Check for redundant scrapes in this session
+                if url in self.scraped_urls_in_session:
+                    print(f"[*] Skipping {site_name} for location '{location}' (already scraped for keyword '{keyword}')")
+                    continue
+                self.scraped_urls_in_session.add(url)
+
                 print(f"[*] Scraping site: {site_name}")
                 try:
                     page: Page = context.new_page()
                     page.set_default_timeout(self.timeout_ms)
-                    
-                    # Generate search URL
-                    encoded_keyword = urllib.parse.quote(keyword)
-                    encoded_location = urllib.parse.quote(location)
-                    url = config["search_url"].format(keyword=encoded_keyword, location=encoded_location)
                     
                     print(f"[*] Navigating to: {url}")
                     response = page.goto(url, wait_until="domcontentloaded")
