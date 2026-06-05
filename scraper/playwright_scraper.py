@@ -101,8 +101,49 @@ class PlaywrightScraper(BaseScraper):
                     if not response or response.status >= 400:
                         print(f"[!] Warning: Page returned status {response.status if response else 'None'}")
                     
+                    # 1. Bypass Cookie Consent Banners
+                    if "google.com" in url:
+                        try:
+                            accept_btn = page.locator("button#L2AGLb")
+                            if accept_btn.count() > 0:
+                                print("[*] Google consent banner detected. Clicking 'Accept all'...")
+                                accept_btn.first.click()
+                                page.wait_for_load_state("domcontentloaded")
+                                time.sleep(1.0)
+                        except Exception as e:
+                            print(f"[!] Error bypassing Google consent: {e}")
+                            
+                    elif "leforem.be" in url:
+                        try:
+                            accept_btn = page.locator("button:has-text('autorise tous')")
+                            if accept_btn.count() > 0:
+                                print("[*] Forem cookie banner detected. Clicking...")
+                                accept_btn.first.click()
+                                time.sleep(1.0)
+                        except Exception as e:
+                            print(f"[!] Error bypassing Forem cookie banner: {e}")
+                            
+                    elif "adecco.be" in url:
+                        try:
+                            page.evaluate("""() => {
+                                const sdk = document.getElementById('onetrust-consent-sdk');
+                                if (sdk) sdk.remove();
+                                const filter = document.querySelector('.onetrust-pc-dark-filter');
+                                if (filter) filter.remove();
+                                document.body.style.overflow = 'visible';
+                            }""")
+                            time.sleep(1.0)
+                        except Exception as e:
+                            print(f"[!] Error bypassing Adecco cookie banner: {e}")
+                    
                     time.sleep(random.uniform(2.0, 4.0)) # Let page settle
                     self._human_scroll(page)
+
+                    # 2. Wait for listing container to load (helps dynamic/SPA sites)
+                    try:
+                        page.wait_for_selector(config["listing_container"], timeout=8000)
+                    except Exception:
+                        pass
 
                     # Extract job listing elements
                     listings = page.query_selector_all(config["listing_container"])
@@ -114,27 +155,62 @@ class PlaywrightScraper(BaseScraper):
                             title_elem = item.query_selector(config["title"])
                             job_title = title_elem.inner_text().strip() if title_elem else "N/A"
                             
+                            # Clean Forem company label prefix if title contains it
+                            if site_name == "forem" and "Nom d'entreprise" in job_title:
+                                job_title = job_title.split("Nom d'entreprise :")[0].strip()
+                            
                             # 2. Company
                             company_elem = item.query_selector(config["company"])
                             company = company_elem.inner_text().strip() if company_elem else "N/A"
                             
+                            # Clean Forem company label prefix
+                            if site_name == "forem" and "Nom d'entreprise" in company:
+                                company = company.replace("Nom d'entreprise :", "").strip()
+                            
                             # 3. URL
                             job_url = "N/A"
                             url_elem = item.query_selector(config["url"])
-                            if url_elem:
-                                href = url_elem.get_attribute("href")
-                                if href:
-                                    # Handle relative paths
-                                    if href.startswith("/"):
-                                        parsed_base = urllib.parse.urlparse(url)
-                                        job_url = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
-                                    else:
-                                        # Remove Google redirection wrappers if present
-                                        if "url?q=" in href:
-                                            match = re.search(r"url\?q=([^&]+)", href)
-                                            if match:
-                                                href = urllib.parse.unquote(match.group(1))
-                                        job_url = href
+                            href = url_elem.get_attribute("href") if url_elem else None
+                            
+                            # Fallback 1: check if the card container itself has a href attribute
+                            if (not href or href in ["#", "javascript:void(0)"]):
+                                container_href = item.get_attribute("href")
+                                if container_href and container_href not in ["#", "javascript:void(0)"]:
+                                    href = container_href
+                                    
+                            # Fallback 2: search for ANY anchor tag with a valid href inside the container
+                            if (not href or href in ["#", "javascript:void(0)"]):
+                                try:
+                                    all_links = item.query_selector_all("a")
+                                    for link in all_links:
+                                        link_href = link.get_attribute("href")
+                                        if link_href and link_href not in ["#", "javascript:void(0)"]:
+                                            href = link_href
+                                            break
+                                except Exception:
+                                    pass
+                                
+                            if href:
+                                # Handle relative paths
+                                if href.startswith("/"):
+                                    parsed_base = urllib.parse.urlparse(url)
+                                    job_url = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
+                                else:
+                                    # Remove Google redirection wrappers if present
+                                    if "url?q=" in href:
+                                        match = re.search(r"url\?q=([^&]+)", href)
+                                        if match:
+                                            href = urllib.parse.unquote(match.group(1))
+                                    job_url = href
+                                    
+                            # Handle Adecco split-pane details extraction
+                            if site_name == "adecco":
+                                try:
+                                    item.click(force=True)
+                                    time.sleep(1.5)
+                                    job_url = page.url
+                                except Exception as click_err:
+                                    print(f"[!] Error clicking Adecco card: {click_err}")
                             
                             # 4. Description snippet
                             desc_elem = item.query_selector(config["description"])
@@ -147,7 +223,12 @@ class PlaywrightScraper(BaseScraper):
                             # Navigate to detail page if possible to get complete description
                             full_description = description
                             if job_url != "N/A" and config.get("detail_page_desc"):
-                                full_description = self._scrape_job_details(context, job_url, config["detail_page_desc"], description)
+                                if site_name == "adecco":
+                                    # Extract from the same page details pane
+                                    detail_elem = page.query_selector(config["detail_page_desc"])
+                                    full_description = detail_elem.inner_text().strip() if detail_elem else description
+                                else:
+                                    full_description = self._scrape_job_details(context, job_url, config["detail_page_desc"], description)
 
                             # Identify original source domain from URL
                             source_site = site_name

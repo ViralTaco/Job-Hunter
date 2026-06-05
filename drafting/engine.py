@@ -24,29 +24,22 @@ class DraftingEngine:
         self, 
         prompt: str, 
         system_instruction: Optional[str] = None, 
-        max_retries: int = 3, 
+        max_retries: int = 4, 
         base_delay: float = 2.0
     ) -> str:
         """
-        Invokes the Gemini API (gemini-2.5-flash) with retry logic and exponential backoff.
+        Invokes the Gemini API with retry logic, exponential backoff, and model cycling fallbacks.
         """
         if not self.client:
             raise RuntimeError(
                 "Gemini Client is not initialized. Please ensure GEMINI_API_KEY is configured."
             )
 
-        for attempt in range(max_retries):
-            try:
-                # Setup configuration for content generation
-                config_kwargs = {}
-                if system_instruction:
-                    # The modern SDK uses system_instruction parameter or configs.
-                    # We can use the default standard prompt structure or configurations
-                    pass
+        models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"]
 
-                # Let's combine system instruction and prompt for robustness if needed,
-                # or pass system instruction in the API config.
-                # In google-genai, the system instruction is passed inside the types.GenerateContentConfig
+        for attempt in range(max_retries):
+            model_name = models[attempt % len(models)]
+            try:
                 from google.genai import types
                 
                 gen_config = types.GenerateContentConfig(
@@ -54,8 +47,9 @@ class DraftingEngine:
                     temperature=0.3,
                 )
 
+                print(f"[*] Calling Gemini API using model '{model_name}' (attempt {attempt + 1})...")
                 response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=model_name,
                     contents=prompt,
                     config=gen_config
                 )
@@ -65,12 +59,12 @@ class DraftingEngine:
                 raise ValueError("Received empty response from Gemini API.")
 
             except errors.APIError as api_err:
-                print(f"[!] Gemini API Error on attempt {attempt + 1}: {api_err}")
+                print(f"[!] Gemini API Error on model '{model_name}' on attempt {attempt + 1}: {api_err}")
                 if attempt == max_retries - 1:
                     raise api_err
                 time.sleep(base_delay * (2 ** attempt))
             except Exception as e:
-                print(f"[!] Unexpected error calling Gemini on attempt {attempt + 1}: {e}")
+                print(f"[!] Unexpected error calling Gemini model '{model_name}' on attempt {attempt + 1}: {e}")
                 if attempt == max_retries - 1:
                     raise e
                 time.sleep(base_delay * (2 ** attempt))

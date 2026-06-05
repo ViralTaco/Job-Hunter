@@ -4,9 +4,9 @@ from typing import Dict, Any
 SELECTOR_CONFIG: Dict[str, Dict[str, Any]] = {
     "google": {
         "search_url": "https://www.google.com/search?q=site:leforem.be+OR+site:ictjob.be+OR+site:randstad.be+OR+site:adecco.be+OR+site:manpower.be+\"{keyword}\"+\"{location}\"",
-        "listing_container": "div.g, div.hlcw0c, div.kp-blk",
+        "listing_container": "div.g, div.hlcw0c, div.kp-blk, div.MjjYud",
         "title": "h3",
-        "company": "span.baseline, cite, .OSrXXb",
+        "company": "span.baseline, cite, .OSrXXb, span.VuuXrf",
         "url": "a",
         "description": ".VwiC3b, div[style*='-webkit-line-clamp']",
         "use_stealth": True,
@@ -14,16 +14,16 @@ SELECTOR_CONFIG: Dict[str, Dict[str, Any]] = {
     },
     "forem": {
         "search_url": "https://www.leforem.be/recherche-offres/resultat-recherche-offre?query={keyword}&operateur=ET&lieu=Nomenclatures/CodeInsBelge_2F2DB6AA-3ADD-4067-9049-BEB7C71ACA8E",
-        "listing_container": ".job-card, article.job, li.search-result, .card-job, .offres-emplois-liste-item",
-        "title": "h2, h3, a.job-title, .title, a.card-link",
-        "company": ".company, .employer, .nom-entreprise, .employer-name",
-        "url": "a, a.card-link",
-        "description": ".description, .snippet, .job-description, .description-job",
+        "listing_container": "forem-formattedcard, .formated-card, app-offre-emploi-card, app-job-card, app-search-result-card, .job-card, article.job, li.search-result, .card-job, .offres-emplois-liste-item",
+        "title": ".formated-card-title h3, h3.offre-card-title, h2, h3, a.job-title, .title, a.card-link",
+        "company": ".formated-card-entreprise-name, .company, .employer, .nom-entreprise, .employer-name",
+        "url": "a.formated-card-content, a.refContent, a, a.card-link",
+        "description": ".formated-card-description, .description, .snippet, .job-description, .description-job",
         "use_stealth": True,
         "detail_page_desc": "#job-description, .job-description, .content-job"
     },
     "randstad": {
-        "search_url": "https://www.randstad.be/nl/vacatures/?q={keyword}&l={location}",
+        "search_url": "https://www.randstad.be/nl/vacatures/q-{keyword}/l-{location}/",
         "listing_container": ".job-item, .card-job, .vacancy-card, .job-card",
         "title": "h3, a.title, .job-title, a.vacancy-link",
         "company": ".company, .employer-name, .client-name",
@@ -65,9 +65,9 @@ SELECTOR_CONFIG: Dict[str, Dict[str, Any]] = {
     "indeed": {
         "search_url": "https://be.indeed.com/jobs?q={keyword}&l={location}",
         "listing_container": ".job_seen_beacon",
-        "title": "h2.jobTitle a, a.jcs-JobDetails-title",
+        "title": "h2.jobTitle a, a.jcs-JobDetails-title, a.jcs-JobTitle",
         "company": "[data-testid='company-name'], .companyName",
-        "url": "h2.jobTitle a, a.jcs-JobDetails-title",
+        "url": "h2.jobTitle a, a.jcs-JobDetails-title, a.jcs-JobTitle",
         "description": ".job-snippet, #jobDescriptionText",
         "use_stealth": True,
         "detail_page_desc": "#jobDescriptionText"
