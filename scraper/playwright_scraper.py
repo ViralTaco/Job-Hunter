@@ -1,4 +1,5 @@
 import time
+import re
 import random
 import urllib.parse
 from typing import List, Dict, Any
@@ -119,14 +120,20 @@ class PlaywrightScraper(BaseScraper):
                             
                             # 3. URL
                             job_url = "N/A"
-                            if title_elem:
-                                href = title_elem.get_attribute("href")
+                            url_elem = item.query_selector(config["url"])
+                            if url_elem:
+                                href = url_elem.get_attribute("href")
                                 if href:
                                     # Handle relative paths
                                     if href.startswith("/"):
                                         parsed_base = urllib.parse.urlparse(url)
                                         job_url = f"{parsed_base.scheme}://{parsed_base.netloc}{href}"
                                     else:
+                                        # Remove Google redirection wrappers if present
+                                        if "url?q=" in href:
+                                            match = re.search(r"url\?q=([^&]+)", href)
+                                            if match:
+                                                href = urllib.parse.unquote(match.group(1))
                                         job_url = href
                             
                             # 4. Description snippet
@@ -142,13 +149,21 @@ class PlaywrightScraper(BaseScraper):
                             if job_url != "N/A" and config.get("detail_page_desc"):
                                 full_description = self._scrape_job_details(context, job_url, config["detail_page_desc"], description)
 
+                            # Identify original source domain from URL
+                            source_site = site_name
+                            if site_name == "google" and job_url != "N/A":
+                                for domain in ["ictjob", "indeed", "forem", "randstad", "adecco", "manpower"]:
+                                    if domain in job_url:
+                                        source_site = domain
+                                        break
+
                             results.append({
                                 "job_title": job_title,
                                 "company": company,
                                 "url": job_url,
                                 "description": full_description,
                                 "location": location,
-                                "source_site": site_name
+                                "source_site": source_site
                             })
                             
                         except Exception as item_err:

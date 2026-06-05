@@ -1,5 +1,9 @@
 import argparse
 import sys
+import os
+import threading
+import builtins
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -68,37 +72,9 @@ def run_pipeline(
     if not search_only:
         resume_text = load_resume_text(resume_path)
 
-    # 3. Scraping Phase
-    raw_listings: List[Dict[str, Any]] = []
-    scraper = PlaywrightScraper(headless=config.SCRAPE_HEADLESS, timeout_ms=config.SCRAPE_TIMEOUT_MS)
-
-    for keyword in config.TECHNICAL_KEYWORDS:
-        for location in config.TARGET_LOCATIONS:
-            try:
-                listings = scraper.scrape_jobs(keyword=keyword, location=location)
-                raw_listings.extend(listings)
-            except Exception as e:
-                print(f"[!] Scraping failed for keyword '{keyword}' in '{location}': {e}")
-                continue
-
-    if not raw_listings:
-        print("[*] No listings returned by the scraper. Exiting.")
-        return
-
-    # 4. Data Pipeline: Validation & Deduplication
+    # 3. Initialize Shared Pipeline, Connectors & Locks
     pipeline = DataPipeline(cache_file_path=config.PROCESSED_JOBS_PATH)
-    normalized_listings = pipeline.normalize_and_validate(raw_listings)
-    new_listings = pipeline.deduplicate(normalized_listings)
-
-    if not new_listings:
-        print("[*] All scraped listings were duplicates. No new jobs to process.")
-        return
-
-    # Limit the number of jobs processed in a single run (avoids API rate limits)
-    processing_batch = new_listings[:limit]
-    print(f"[*] Processing {len(processing_batch)} new listings out of {len(new_listings)} scraped (limit: {limit}).")
-
-    # 5. Initialize Connectors
+    
     sheets_connector = (
         DryRunSheetsConnector(config.SERVICE_ACCOUNT_PATH, config.GOOGLE_SHEET_NAME, config.GOOGLE_SHEET_TAB)
         if use_dry_run_sheets
@@ -122,37 +98,153 @@ def run_pipeline(
             config.GOOGLE_SHEET_TAB
         )
 
-    # 6. Drafting & Export Phase
-    for index, job in enumerate(processing_batch, 1):
-        print(f"\n--- [{index}/{len(processing_batch)}] Processing: {job.job_title} at {job.company} ---")
-        
-        status = "Scraped"
-        cover_letter = ""
+    # Scraper instance is thread-safe as it launches browser contexts per thread
+    scraper = PlaywrightScraper(headless=config.SCRAPE_HEADLESS, timeout_ms=config.SCRAPE_TIMEOUT_MS)
+    
+    # Thread locks for shared resources
+    locks = {
+        "pipeline": threading.Lock(),
+        "sheets": threading.Lock(),
+        "counter": threading.Lock()
+    }
+    
+    shared_state = {
+        "processed_count": 0
+    }
 
-        if resume_text and not search_only:
-            try:
-                # A. Redact Resume
-                redacted_resume = draft_engine.redact_resume(resume_text)
-                
-                # B. Generate cover letter
-                cover_letter = draft_engine.generate_cover_letter(
-                    clean_resume=redacted_resume, 
-                    job_description=job.description
-                )
-                status = "Drafted"
-                print("[*] Tailored cover letter drafted.")
-            except Exception as draft_err:
-                print(f"[!] Cover letter drafting failed: {draft_err}")
-                status = "Scraping Succeeded (Drafting Failed)"
+    # Prepare tasks list
+    tasks = []
+    for keyword in config.TECHNICAL_KEYWORDS:
+        for location in config.TARGET_LOCATIONS:
+            tasks.append((keyword, location))
 
-        # C. Write to sheet
+    # Overwrite builtins.print to prevent console clutter during progress updates
+    _original_print = builtins.print
+    
+    try:
+        with open("job_hunter.log", "w", encoding="utf-8") as f:
+            f.write("=== Job Hunter Execution Log ===\n")
+    except Exception:
+        pass
+
+    def redirect_print_to_file(*args, **kwargs):
         try:
-            sheets_connector.append_job(job, status=status, cover_letter=cover_letter)
-        except Exception as sheet_err:
-            print(f"[!] Error writing job to sheets: {sheet_err}")
+            with open("job_hunter.log", "a", encoding="utf-8") as f:
+                f.write(" ".join(map(str, args)) + "\n")
+        except Exception:
+            pass
+
+    # Redirect prints
+    builtins.print = redirect_print_to_file
+
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+
+    _original_print(f"[*] Starting {len(tasks)} queries in parallel threads. Rendering dashboard...")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TimeElapsedColumn(),
+    ) as progress:
+
+        # Limit thread count to core count - 1
+        cpu_cores = os.cpu_count()
+        max_workers = max(1, (cpu_cores - 1) if cpu_cores else 3)
+
+        def process_task(keyword: str, location: str, task_id) -> None:
+            """Worker task to process a single keyword and location combination."""
+            # 1. Check limit before starting work
+            with locks["counter"]:
+                if shared_state["processed_count"] >= limit:
+                    progress.update(task_id, description=f"[{keyword}@{location}] Stopped (Limit reached)", completed=100)
+                    return
+
+            progress.update(task_id, description=f"[{keyword}@{location}] Initializing browser...", completed=10)
+
+            try:
+                listings = scraper.scrape_jobs(keyword=keyword, location=location)
+                progress.update(task_id, description=f"[{keyword}@{location}] Scraped ({len(listings)} found)", completed=50)
+                if not listings:
+                    progress.update(task_id, description=f"[{keyword}@{location}] Finished (0 found)", completed=100)
+                    return
+                
+                # 2. Validate & Deduplicate (locked to prevent cache corruption)
+                progress.update(task_id, description=f"[{keyword}@{location}] Filtering duplicates...", completed=60)
+                with locks["pipeline"]:
+                    normalized_listings = pipeline.normalize_and_validate(listings)
+                    new_listings = pipeline.deduplicate(normalized_listings)
+                
+                if not new_listings:
+                    progress.update(task_id, description=f"[{keyword}@{location}] Finished (duplicates)", completed=100)
+                    return
+                
+                progress.update(task_id, description=f"[{keyword}@{location}] Processing {len(new_listings)} new jobs", completed=70)
+
+                # 3. Process each listing
+                for job in new_listings:
+                    with locks["counter"]:
+                        if shared_state["processed_count"] >= limit:
+                            progress.update(task_id, description=f"[{keyword}@{location}] Stopped (Limit reached)", completed=100)
+                            return
+                        shared_state["processed_count"] += 1
+                        local_idx = shared_state["processed_count"]
+                    
+                    status = "Scraped"
+                    cover_letter = ""
+
+                    if resume_text and not search_only:
+                        progress.update(task_id, description=f"[{keyword}@{location}] Drafting: {job.job_title[:20]}...", completed=80)
+                        try:
+                            # Redaction and drafting run concurrently without locks
+                            redacted_resume = draft_engine.redact_resume(resume_text)
+                            cover_letter = draft_engine.generate_cover_letter(
+                                clean_resume=redacted_resume, 
+                                job_description=job.description
+                            )
+                            status = "Drafted"
+                        except Exception:
+                            status = "Scraping Succeeded (Drafting Failed)"
+
+                    # 4. Write to Google Sheet (locked to prevent concurrent write collisions)
+                    progress.update(task_id, description=f"[{keyword}@{location}] Appending to Sheet...", completed=90)
+                    with locks["sheets"]:
+                        try:
+                            sheets_connector.append_job(job, status=status, cover_letter=cover_letter)
+                        except Exception:
+                            pass
+                
+                progress.update(task_id, description=f"[{keyword}@{location}] Completed!", completed=100)
+                            
+            except Exception as e:
+                progress.update(task_id, description=f"[{keyword}@{location}] Failed: {str(e)[:25]}", completed=100)
+
+        # Create tasks on progress and submit to executor
+        futures = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for keyword, location in tasks:
+                # Add task to progress dashboard
+                task_id = progress.add_task(
+                    description=f"[{keyword}@{location}] Pending...", 
+                    total=100
+                )
+                futures.append(executor.submit(process_task, keyword, location, task_id))
+            
+            # Wait for all threads to finish
+            for fut in futures:
+                try:
+                    fut.result()
+                except Exception:
+                    pass
+
+    # Restore original print function
+    builtins.print = _original_print
 
     print("\n==================================================")
-    print("      JOB SEARCH PIPELINE WORKFLOW COMPLETE       ")
+    print(f"      JOB SEARCH PIPELINE WORKFLOW COMPLETE       ")
+    print(f"      Processed & logged: {shared_state['processed_count']} jobs  ")
+    print("      (Detailed log written to: job_hunter.log)   ")
     print("==================================================")
 
 

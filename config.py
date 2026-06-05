@@ -42,19 +42,14 @@ GOOGLE_SHEET_TAB: str = _config_data.get("sheet_tab")
 # Pre-defined query structures for popular portals
 SEARCH_QUERIES = [
     {
-        "name": "ICTJob",
-        "base_url": "https://www.ictjob.be/en/search-it-jobs",
-        "url_template": "https://www.ictjob.be/en/search-it-jobs?keywords={keyword}&location={location}",
-    },
-    {
-        "name": "Indeed",
-        "base_url": "https://be.indeed.com/jobs",
-        "url_template": "https://be.indeed.com/jobs?q={keyword}&l={location}",
+        "name": "Google",
+        "base_url": "https://www.google.com",
+        "url_template": "https://www.google.com/search?q=site:leforem.be+OR+site:ictjob.be+OR+site:randstad.be+OR+site:adecco.be+OR+site:manpower.be+\"{keyword}\"+\"{location}\"",
     },
     {
         "name": "Forem",
         "base_url": "https://www.leforem.be/recherche-offres-emploi",
-        "url_template": "https://www.leforem.be/recherche-offres-emploi/resultats?motsCles={keyword}",
+        "url_template": "https://www.leforem.be/recherche-offres/resultat-recherche-offre?query={keyword}&operateur=ET&lieu=Nomenclatures/CodeInsBelge_2F2DB6AA-3ADD-4067-9049-BEB7C71ACA8E",
     },
     {
         "name": "Randstad",
@@ -70,7 +65,12 @@ SEARCH_QUERIES = [
         "name": "Manpower",
         "base_url": "https://www.manpower.be/en/jobs",
         "url_template": "https://www.manpower.be/en/jobs?search={keyword}&location={location}",
-    }
+    },
+    {
+        "name": "ICTJob",
+        "base_url": "https://www.ictjob.be/en/search-it-jobs",
+        "url_template": "https://www.ictjob.be/en/search-it-jobs?keywords={keyword}&location={location}",
+    },
 ]
 
 
